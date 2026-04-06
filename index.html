@@ -1,0 +1,1673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VaultDrive — Cloud Storage</title>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- EmailJS for OTP emails -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+
+<style>
+/* ══════════════════════════════════════════════
+   DESIGN TOKENS — Warm Obsidian + Amber
+══════════════════════════════════════════════ */
+:root {
+  --ink: #08070f;
+  --ink2: #0f0e1a;
+  --ink3: #16152a;
+  --ink4: #1e1d35;
+  --ink5: #282640;
+  --rim: #ffffff07;
+  --rim2: #ffffff12;
+  --rim3: #ffffff20;
+  --rim4: #ffffff30;
+  --amber: #f59e0b;
+  --amber2: #fbbf24;
+  --amber3: #fde68a;
+  --coral: #fb7185;
+  --mint: #34d399;
+  --sky: #38bdf8;
+  --violet: #a78bfa;
+  --snow: #f0eff8;
+  --fog: #8b8aaa;
+  --mist: #5c5b7a;
+  --shadow: #00000090;
+  --r: 12px;
+  --r2: 18px;
+  --r3: 24px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--ink);
+  color: var(--snow);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grain */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9998; opacity: .5;
+}
+
+/* ══════════════════════════════════════════════
+   SETUP WIZARD (shown on first run)
+══════════════════════════════════════════════ */
+#setupWizard {
+  position: fixed; inset: 0; z-index: 10000;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.setup-card {
+  background: var(--ink3);
+  border: 1px solid var(--rim3);
+  border-radius: var(--r3);
+  padding: 40px;
+  max-width: 600px; width: 100%;
+  box-shadow: 0 40px 120px var(--shadow);
+  animation: popUp .5s cubic-bezier(.22,1,.36,1) both;
+}
+.setup-card h2 {
+  font-family: 'Fraunces', serif;
+  font-size: 28px; font-weight: 700;
+  background: linear-gradient(135deg, var(--amber), var(--amber3));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+.setup-card .sub { color: var(--fog); font-size: 14px; margin-bottom: 28px; line-height: 1.6; }
+.setup-step { margin-bottom: 22px; }
+.setup-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--fog); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.setup-label .step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--amber); color: #000; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.setup-input {
+  width: 100%; padding: 12px 16px;
+  background: var(--ink4); border: 1px solid var(--rim3);
+  border-radius: var(--r); color: var(--snow);
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  outline: none; transition: border-color .2s;
+}
+.setup-input:focus { border-color: var(--amber); box-shadow: 0 0 0 3px #f59e0b18; }
+.setup-hint { font-size: 12px; color: var(--mist); margin-top: 6px; line-height: 1.5; }
+.setup-hint a { color: var(--amber); }
+.setup-btn {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  border: none; border-radius: var(--r); cursor: pointer;
+  font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700;
+  color: #000; transition: all .2s; margin-top: 10px;
+  box-shadow: 0 8px 30px #f59e0b30;
+}
+.setup-btn:hover { transform: translateY(-1px); box-shadow: 0 12px 40px #f59e0b40; }
+.setup-divider { text-align: center; color: var(--mist); font-size: 13px; margin: 16px 0; }
+.skip-setup { text-align: center; margin-top: 12px; font-size: 13px; color: var(--fog); }
+.skip-setup span { color: var(--amber); cursor: pointer; font-weight: 600; }
+.skip-setup span:hover { text-decoration: underline; }
+.setup-warning { background: #fb718520; border: 1px solid #fb718540; border-radius: var(--r); padding: 12px 14px; font-size: 13px; color: #fb9faa; margin-bottom: 18px; line-height: 1.5; }
+
+/* ══════════════════════════════════════════════
+   AUTH PAGES
+══════════════════════════════════════════════ */
+#authWrap { display: flex; min-height: 100vh; }
+
+.auth-panel-left {
+  width: 46%; position: relative; overflow: hidden;
+  background: radial-gradient(ellipse at 30% 50%, #1a1528 0%, var(--ink) 70%);
+  display: flex; flex-direction: column; justify-content: center;
+  align-items: flex-start; padding: 60px 52px;
+}
+
+/* Animated mesh background */
+.mesh {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 20% 30%, #f59e0b18 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, #a78bfa12 0%, transparent 50%),
+    radial-gradient(circle at 60% 20%, #34d39910 0%, transparent 40%);
+  animation: meshShift 8s ease-in-out infinite alternate;
+}
+@keyframes meshShift {
+  from { transform: scale(1) rotate(0deg); }
+  to   { transform: scale(1.05) rotate(2deg); }
+}
+
+.auth-brand { position: relative; z-index: 2; }
+.auth-logo-mark {
+  width: 64px; height: 64px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; margin-bottom: 28px;
+  box-shadow: 0 20px 60px #f59e0b35;
+}
+.auth-brand h1 {
+  font-family: 'Fraunces', serif;
+  font-size: 52px; font-weight: 700; line-height: .95;
+  letter-spacing: -2px;
+  background: linear-gradient(160deg, #fff 0%, var(--amber) 60%, var(--amber3) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.auth-brand .tagline { color: var(--fog); font-size: 15px; margin-top: 14px; line-height: 1.7; max-width: 320px; }
+
+.feature-list { margin-top: 48px; display: flex; flex-direction: column; gap: 12px; position: relative; z-index: 2; }
+.feat {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px;
+  background: var(--rim);
+  border: 1px solid var(--rim2);
+  border-radius: var(--r);
+  backdrop-filter: blur(10px);
+}
+.feat-icon { font-size: 22px; flex-shrink: 0; }
+.feat-body { font-size: 13px; color: var(--fog); line-height: 1.45; }
+.feat-body strong { color: var(--snow); display: block; font-size: 14px; font-weight: 600; }
+
+/* Right auth panel */
+.auth-panel-right {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 40px; background: var(--ink2);
+  border-left: 1px solid var(--rim2);
+}
+
+.auth-card {
+  width: 100%; max-width: 420px;
+  background: var(--ink3); border: 1px solid var(--rim2);
+  border-radius: var(--r3); padding: 40px;
+  box-shadow: 0 40px 100px var(--shadow);
+  animation: popUp .45s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes popUp {
+  from { opacity: 0; transform: translateY(28px) scale(.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.auth-card-head { margin-bottom: 30px; }
+.auth-card-head h2 {
+  font-family: 'Fraunces', serif; font-size: 30px; font-weight: 700;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, var(--snow), var(--fog));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.auth-card-head p { color: var(--fog); font-size: 14px; margin-top: 6px; }
+
+/* Google Sign-In button area */
+.google-btn-wrap {
+  width: 100%; margin-bottom: 20px;
+}
+/* Override Google's button for our theme */
+.google-btn-custom {
+  width: 100%; padding: 13px 18px;
+  background: #fff; border: 1px solid #e0e0e0;
+  border-radius: var(--r); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600;
+  color: #3c4043; transition: all .2s;
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  box-shadow: 0 2px 8px #0000001a;
+}
+.google-btn-custom:hover { box-shadow: 0 4px 16px #0000002a; transform: translateY(-1px); }
+.google-btn-custom svg { flex-shrink: 0; }
+
+.auth-divider {
+  display: flex; align-items: center; gap: 12px; margin: 18px 0;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--rim3);
+}
+.auth-divider span { font-size: 12px; color: var(--mist); white-space: nowrap; }
+
+.fg { margin-bottom: 16px; }
+.fl { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--mist); margin-bottom: 7px; }
+.fi {
+  width: 100%; padding: 12px 16px;
+  background: var(--ink4); border: 1px solid var(--rim2);
+  border-radius: var(--r); color: var(--snow);
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+  outline: none; transition: all .2s;
+}
+.fi:focus { border-color: var(--amber); box-shadow: 0 0 0 3px #f59e0b15; }
+.fi::placeholder { color: var(--mist); }
+.fi.err { border-color: var(--coral); }
+.fe { font-size: 12px; color: var(--coral); margin-top: 5px; display: none; }
+.fe.on { display: block; }
+.fi-wrap { position: relative; }
+.fi-wrap .fi { padding-right: 44px; }
+.eye { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); cursor: pointer; color: var(--fog); font-size: 15px; user-select: none; }
+
+.fw-link { text-align: right; margin-bottom: 14px; font-size: 12px; color: var(--amber); cursor: pointer; font-weight: 600; }
+.fw-link:hover { text-decoration: underline; }
+
+.btn-main {
+  width: 100%; padding: 14px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  border: none; border-radius: var(--r); cursor: pointer;
+  font-family: 'Fraunces', serif; font-size: 16px; font-weight: 700;
+  color: #000; transition: all .2s; box-shadow: 0 8px 28px #f59e0b28;
+}
+.btn-main:hover { transform: translateY(-1px); box-shadow: 0 12px 36px #f59e0b38; }
+.btn-main:active { transform: none; }
+
+.auth-foot { text-align: center; margin-top: 22px; font-size: 14px; color: var(--fog); }
+.auth-foot a { color: var(--amber); cursor: pointer; font-weight: 600; }
+.auth-foot a:hover { text-decoration: underline; }
+
+/* Password strength */
+.pw-strength { height: 3px; background: var(--rim2); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.pw-strength-fill { height: 100%; border-radius: 2px; transition: all .3s; width: 0; }
+
+/* OTP grid */
+.otp-row { display: flex; gap: 8px; justify-content: center; margin-bottom: 8px; }
+.otp-box {
+  width: 48px; height: 54px; text-align: center;
+  font-family: 'JetBrains Mono', monospace; font-size: 22px; font-weight: 500;
+  background: var(--ink4); border: 1px solid var(--rim3);
+  border-radius: var(--r); color: var(--snow); outline: none; transition: all .2s;
+}
+.otp-box:focus { border-color: var(--amber); box-shadow: 0 0 0 3px #f59e0b18; }
+
+.form-row-2 { display: flex; gap: 12px; }
+.form-row-2 .fg { flex: 1; }
+
+/* ══════════════════════════════════════════════
+   APP SHELL
+══════════════════════════════════════════════ */
+#appShell { display: none; flex-direction: column; min-height: 100vh; }
+#appShell.on { display: flex; }
+
+/* Top navigation */
+.topnav {
+  height: 58px; background: var(--ink2);
+  border-bottom: 1px solid var(--rim2);
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 22px; position: sticky; top: 0; z-index: 200;
+  flex-shrink: 0;
+}
+.tn-logo { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+.tn-logo-box {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.tn-logo-text {
+  font-family: 'Fraunces', serif; font-size: 19px; font-weight: 700;
+  background: linear-gradient(135deg, #fff, var(--amber));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; letter-spacing: -.5px;
+}
+
+.tn-search {
+  flex: 1; max-width: 440px; margin-left: 18px;
+  display: flex; align-items: center; gap: 9px;
+  background: var(--ink3); border: 1px solid var(--rim2);
+  border-radius: 10px; padding: 0 14px; height: 36px; transition: all .2s;
+}
+.tn-search:focus-within { border-color: var(--amber); box-shadow: 0 0 0 3px #f59e0b12; }
+.tn-search input { background: none; border: none; outline: none; color: var(--snow); font-family: 'DM Sans', sans-serif; font-size: 14px; flex: 1; }
+.tn-search input::placeholder { color: var(--mist); }
+
+.tn-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* Public toggle pill */
+.view-pill {
+  display: flex; background: var(--ink3); border: 1px solid var(--rim2);
+  border-radius: 8px; padding: 3px; gap: 2px;
+}
+.vp-btn {
+  padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+  background: none; color: var(--fog); transition: all .15s;
+}
+.vp-btn.on { background: var(--ink5); color: var(--snow); }
+
+.icon-btn-nav {
+  width: 34px; height: 34px; border-radius: 9px;
+  border: 1px solid var(--rim2); background: var(--ink3);
+  color: var(--fog); cursor: pointer; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.icon-btn-nav:hover { border-color: var(--amber); color: var(--amber); }
+
+/* Avatar dropdown */
+.avatar-wrap { position: relative; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, var(--amber), var(--coral));
+  border: none; cursor: pointer; font-weight: 800; font-size: 14px; color: #000;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; transition: all .15s;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar:hover { box-shadow: 0 0 0 2px var(--amber); }
+
+.user-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--ink4); border: 1px solid var(--rim3);
+  border-radius: var(--r2); padding: 8px; min-width: 230px;
+  box-shadow: 0 20px 60px var(--shadow); display: none; z-index: 300;
+  animation: popUp .2s ease;
+}
+.user-dropdown.on { display: block; }
+.ud-head {
+  padding: 10px 12px 12px; border-bottom: 1px solid var(--rim2); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ud-avatar { width: 38px; height: 38px; border-radius: 10px; overflow: hidden; flex-shrink: 0; background: linear-gradient(135deg, var(--amber), var(--coral)); display: flex; align-items: center; justify-content: center; font-weight: 800; color: #000; font-size: 16px; }
+.ud-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ud-name { font-weight: 700; font-size: 14px; }
+.ud-email { font-size: 11px; color: var(--fog); font-family: 'JetBrains Mono', monospace; margin-top: 1px; word-break: break-all; }
+.ud-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--fog);
+  transition: all .12s; font-weight: 500;
+}
+.ud-item:hover { background: var(--ink5); color: var(--snow); }
+.ud-item.red:hover { background: #fb718518; color: var(--coral); }
+.ud-sep { height: 1px; background: var(--rim2); margin: 4px 0; }
+
+/* App body */
+.app-body { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 58px); }
+
+/* Sidebar */
+.sidebar {
+  width: 220px; background: var(--ink2);
+  border-right: 1px solid var(--rim2);
+  display: flex; flex-direction: column;
+  overflow-y: auto; flex-shrink: 0;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sb-section { padding: 16px 10px 8px; }
+.sb-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--mist); padding: 0 8px 6px; }
+.sb-item {
+  display: flex; align-items: center; gap: 9px; padding: 9px 10px;
+  border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 500;
+  color: var(--fog); transition: all .12s; position: relative; width: 100%;
+}
+.sb-item:hover { background: var(--ink3); color: var(--snow); }
+.sb-item.on { background: #f59e0b14; color: var(--amber); border: 1px solid #f59e0b1a; }
+.sb-item.on::before { content: ''; position: absolute; left: 0; top: 25%; bottom: 25%; width: 3px; background: var(--amber); border-radius: 0 3px 3px 0; }
+.sb-count { margin-left: auto; font-size: 10px; font-family: 'JetBrains Mono', monospace; background: var(--ink5); padding: 2px 6px; border-radius: 20px; color: var(--fog); }
+
+.storage-box { margin: 10px; padding: 14px; background: var(--ink3); border-radius: var(--r2); border: 1px solid var(--rim2); }
+.sb-r { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 11px; }
+.sb-r span { color: var(--fog); }
+.sb-r strong { color: var(--amber); font-family: 'JetBrains Mono', monospace; }
+.sb-track { height: 4px; background: var(--rim2); border-radius: 2px; overflow: hidden; }
+.sb-fill { height: 100%; background: linear-gradient(90deg, var(--amber), var(--coral)); border-radius: 2px; transition: width .5s; }
+
+/* Main */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+.content-bar {
+  padding: 14px 22px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--rim2); flex-shrink: 0;
+  background: var(--ink);
+}
+.content-title { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; flex: 1; letter-spacing: -.5px; }
+
+.view-toggle { display: flex; background: var(--ink3); border: 1px solid var(--rim2); border-radius: 8px; padding: 3px; gap: 2px; }
+.vt { width: 30px; height: 28px; border-radius: 6px; border: none; background: none; color: var(--fog); cursor: pointer; font-size: 14px; transition: all .12s; display: flex; align-items: center; justify-content: center; }
+.vt.on { background: var(--ink5); color: var(--snow); }
+
+.btn-upload {
+  display: flex; align-items: center; gap: 7px; padding: 9px 18px;
+  background: linear-gradient(135deg, var(--amber), var(--amber2));
+  border: none; border-radius: 9px; cursor: pointer;
+  font-family: 'Fraunces', serif; font-size: 14px; font-weight: 700; color: #000;
+  transition: all .2s; box-shadow: 0 4px 18px #f59e0b25; white-space: nowrap;
+}
+.btn-upload:hover { transform: translateY(-1px); box-shadow: 0 8px 28px #f59e0b38; }
+
+/* Content scroll */
+.content-body { flex: 1; overflow-y: auto; padding: 22px; scrollbar-width: thin; scrollbar-color: var(--rim3) transparent; }
+.content-body::-webkit-scrollbar { width: 5px; }
+.content-body::-webkit-scrollbar-thumb { background: var(--rim3); border-radius: 3px; }
+
+/* Drop zone */
+.drop-zone {
+  border: 2px dashed var(--rim3); border-radius: var(--r2);
+  padding: 28px; text-align: center; margin-bottom: 22px;
+  cursor: pointer; transition: all .2s; background: var(--rim);
+}
+.drop-zone:hover, .drop-zone.active { border-color: var(--amber); background: #f59e0b08; }
+.dz-icon { font-size: 30px; margin-bottom: 8px; }
+.drop-zone h4 { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.drop-zone p { font-size: 12px; color: var(--fog); }
+
+/* Filter chips */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.chip {
+  padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--rim2); background: none; color: var(--fog);
+  cursor: pointer; transition: all .12s; font-family: 'DM Sans', sans-serif;
+}
+.chip:hover { border-color: var(--amber); color: var(--amber); }
+.chip.on { background: var(--amber); border-color: var(--amber); color: #000; }
+
+.meta-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.meta-count { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--mist); }
+
+/* PUBLIC NOTICE banner */
+.public-notice {
+  background: linear-gradient(135deg, #f59e0b18, #a78bfa12);
+  border: 1px solid #f59e0b28;
+  border-radius: var(--r); padding: 12px 16px; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px; font-size: 13px;
+}
+.public-notice strong { color: var(--amber); }
+
+/* Files grid */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+
+.fcard {
+  background: var(--ink3); border: 1px solid var(--rim2);
+  border-radius: var(--r2); padding: 16px 14px;
+  cursor: pointer; transition: all .18s; position: relative; overflow: hidden;
+  animation: popUp .3s ease both;
+}
+.fcard:hover { border-color: var(--rim4); transform: translateY(-2px); box-shadow: 0 14px 40px #00000055; background: var(--ink4); }
+
+.fc-thumb {
+  width: 100%; height: 76px; border-radius: 9px; overflow: hidden;
+  background: var(--ink4); margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 30px;
+}
+.fc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.fc-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
+.fc-sub { font-size: 10px; color: var(--fog); font-family: 'JetBrains Mono', monospace; }
+.fc-owner { font-size: 10px; color: var(--mint); font-weight: 600; margin-top: 2px; }
+
+.fc-tag {
+  position: absolute; top: 8px; right: 8px;
+  font-size: 9px; font-weight: 700; padding: 2px 7px;
+  border-radius: 20px; text-transform: uppercase; font-family: 'JetBrains Mono', monospace;
+}
+.fc-starred { position: absolute; top: 8px; left: 8px; font-size: 12px; }
+.fc-actions { display: none; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 10px; background: linear-gradient(transparent, var(--ink4)); gap: 4px; }
+.fcard:hover .fc-actions { display: flex; }
+.fa-btn {
+  flex: 1; padding: 5px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 10px; font-weight: 700; background: var(--ink5); color: var(--fog);
+  transition: all .12s; font-family: 'DM Sans', sans-serif;
+}
+.fa-btn:hover { background: var(--amber); color: #000; }
+.fa-btn.r:hover { background: var(--coral); color: #fff; }
+
+/* List view */
+.list { display: flex; flex-direction: column; gap: 2px; }
+.frow {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: 10px; cursor: pointer; transition: all .12s;
+  border: 1px solid transparent;
+}
+.frow:hover { background: var(--ink3); border-color: var(--rim2); }
+.fr-ic { font-size: 20px; flex-shrink: 0; }
+.fr-info { flex: 1; min-width: 0; }
+.fr-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fr-meta { font-size: 10px; color: var(--fog); font-family: 'JetBrains Mono', monospace; }
+.fr-owner-lbl { font-size: 10px; color: var(--mint); font-weight: 700; }
+.fr-sz { width: 75px; text-align: right; font-size: 11px; color: var(--fog); font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+.fr-dt { width: 90px; text-align: right; font-size: 11px; color: var(--fog); font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+.fr-acts { display: none; gap: 4px; flex-shrink: 0; }
+.frow:hover .fr-acts { display: flex; }
+.fr-btn {
+  padding: 4px 9px; border-radius: 6px; border: none; cursor: pointer;
+  font-size: 11px; font-weight: 700; background: var(--ink5); color: var(--fog);
+  transition: all .12s; font-family: 'DM Sans', sans-serif;
+}
+.fr-btn:hover { background: var(--amber); color: #000; }
+.fr-btn.r:hover { background: var(--coral); color: #fff; }
+
+/* Shared badge */
+.shared-lbl { font-size: 10px; padding: 2px 7px; border-radius: 20px; background: #34d39918; color: var(--mint); border: 1px solid #34d39928; font-weight: 700; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+
+/* Empty */
+.empty { text-align: center; padding: 60px 20px; color: var(--mist); }
+.empty-icon { font-size: 48px; opacity: .35; margin-bottom: 14px; }
+.empty h3 { font-size: 17px; color: var(--fog); font-weight: 700; margin-bottom: 5px; }
+.empty p { font-size: 13px; }
+
+/* ══════════════════════════════════════════════
+   MODALS
+══════════════════════════════════════════════ */
+.modal-bg {
+  display: none; position: fixed; inset: 0; z-index: 500;
+  background: #00000088; backdrop-filter: blur(5px);
+  align-items: center; justify-content: center;
+}
+.modal-bg.on { display: flex; }
+
+.modal {
+  background: var(--ink3); border: 1px solid var(--rim3);
+  border-radius: var(--r3); padding: 32px;
+  max-width: 500px; width: 92%;
+  box-shadow: 0 40px 120px var(--shadow);
+  animation: popUp .25s cubic-bezier(.34,1.56,.64,1) both;
+  position: relative; max-height: 85vh; display: flex; flex-direction: column;
+}
+.modal-body { overflow-y: auto; flex: 1; padding-right: 4px; scrollbar-width: thin; scrollbar-color: var(--rim3) transparent; }
+.modal h3 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; flex-shrink: 0; }
+.modal > p { color: var(--fog); font-size: 13px; margin-bottom: 20px; flex-shrink: 0; }
+.modal-x { position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; border-radius: 7px; border: none; background: var(--ink5); color: var(--fog); cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all .12s; }
+.modal-x:hover { background: #fb718520; color: var(--coral); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-shrink: 0; }
+.btn-c { padding: 9px 20px; border-radius: 9px; border: 1px solid var(--rim2); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; background: none; color: var(--fog); transition: all .12s; }
+.btn-c:hover { border-color: var(--fog); color: var(--snow); }
+.btn-ok { padding: 9px 20px; border-radius: 9px; border: none; cursor: pointer; font-family: 'Fraunces', serif; font-size: 14px; font-weight: 700; background: linear-gradient(135deg, var(--amber), var(--amber2)); color: #000; transition: all .2s; }
+.btn-ok:hover { transform: translateY(-1px); box-shadow: 0 6px 18px #f59e0b28; }
+.btn-del { padding: 9px 20px; border-radius: 9px; border: 1px solid #fb718535; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; background: #fb718515; color: var(--coral); transition: all .15s; }
+.btn-del:hover { background: var(--coral); color: #fff; }
+
+/* Share modal */
+.share-link-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.share-link-inp { flex: 1; padding: 9px 13px; background: var(--ink4); border: 1px solid var(--rim3); border-radius: 9px; color: var(--snow); font-family: 'JetBrains Mono', monospace; font-size: 11px; outline: none; }
+.btn-copy { padding: 9px 14px; border-radius: 9px; border: 1px solid var(--rim3); background: var(--ink5); color: var(--fog); cursor: pointer; font-weight: 700; font-size: 12px; transition: all .12s; white-space: nowrap; }
+.btn-copy:hover { border-color: var(--amber); color: var(--amber); }
+
+.share-add-row { display: flex; gap: 8px; margin-top: 12px; }
+.share-email-in { flex: 1; padding: 10px 13px; background: var(--ink4); border: 1px solid var(--rim2); border-radius: 9px; color: var(--snow); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: all .2s; }
+.share-email-in:focus { border-color: var(--mint); }
+.btn-mint { padding: 10px 16px; border-radius: 9px; border: none; cursor: pointer; background: var(--mint); color: #000; font-weight: 700; font-size: 13px; white-space: nowrap; transition: all .15s; }
+.btn-mint:hover { transform: translateY(-1px); box-shadow: 0 5px 16px #34d39930; }
+
+.share-user-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--rim2); }
+.su-av { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; color: #000; flex-shrink: 0; }
+.su-info { flex: 1; }
+.su-name { font-size: 13px; font-weight: 600; }
+.su-email { font-size: 10px; color: var(--fog); font-family: 'JetBrains Mono', monospace; }
+.su-remove { font-size: 11px; color: var(--coral); cursor: pointer; font-weight: 700; padding: 4px 8px; border-radius: 5px; border: none; background: none; transition: all .12s; }
+.su-remove:hover { background: #fb718515; }
+
+/* Context menu */
+.ctx { position: fixed; z-index: 800; background: var(--ink4); border: 1px solid var(--rim3); border-radius: var(--r2); padding: 6px; min-width: 175px; box-shadow: 0 16px 48px var(--shadow); display: none; }
+.ctx.on { display: block; animation: popUp .15s ease; }
+.ctx-i { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 8px; cursor: pointer; font-size: 13px; color: var(--fog); transition: all .1s; font-weight: 500; }
+.ctx-i:hover { background: var(--ink5); color: var(--snow); }
+.ctx-i.red { color: var(--coral); }
+.ctx-i.red:hover { background: #fb718515; }
+.ctx-sep { height: 1px; background: var(--rim2); margin: 4px 0; }
+
+/* Toast */
+.toast-stack { position: fixed; bottom: 22px; right: 22px; z-index: 9000; display: flex; flex-direction: column; gap: 8px; }
+.toast { display: flex; align-items: center; gap: 9px; padding: 11px 16px; background: var(--ink4); border: 1px solid var(--rim3); border-radius: 11px; font-size: 13px; font-weight: 600; box-shadow: 0 8px 28px var(--shadow); animation: slideR .3s ease; max-width: 310px; }
+@keyframes slideR { from { transform: translateX(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+.toast.ok { border-color: #34d39930; }
+.toast.err { border-color: #fb718530; }
+.toast.inf { border-color: #38bdf830; }
+
+/* Spinner */
+.spin { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--rim3); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Section label */
+.sec-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--mist); margin-bottom: 8px; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+
+/* Responsive */
+@media(max-width: 700px) {
+  .auth-panel-left { display: none; }
+  .sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     SETUP WIZARD
+══════════════════════════════════════════════ -->
+<div id="setupWizard">
+  <div class="setup-card">
+    <h2>⚙ VaultDrive Setup</h2>
+    <p class="sub">To enable Google login and real Gmail OTP, you need to provide your API credentials. These are stored only in your browser — never sent anywhere.</p>
+
+    <div class="setup-warning">
+      ⚠ <strong>Demo mode available:</strong> Skip setup to use email/password login with a simulated OTP (shown on screen). For real Google OAuth + Gmail OTP, fill in the credentials below.
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-label"><span class="step-num">1</span> Google OAuth Client ID</div>
+      <input class="setup-input" id="setupGoogleId" placeholder="1234567890-abc...apps.googleusercontent.com">
+      <div class="setup-hint">
+        Get from <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> → Create OAuth 2.0 Client → Web Application. Add your page URL to "Authorized JavaScript origins".
+      </div>
+    </div>
+
+    <div class="setup-step">
+      <div class="setup-label"><span class="step-num">2</span> EmailJS Settings (for Gmail OTP)</div>
+      <input class="setup-input" id="setupEmailjsPublic" placeholder="EmailJS Public Key (e.g. abc123XYZ)" style="margin-bottom:8px">
+      <input class="setup-input" id="setupEmailjsService" placeholder="EmailJS Service ID (e.g. service_xxxxxx)" style="margin-bottom:8px">
+      <input class="setup-input" id="setupEmailjsTemplate" placeholder="EmailJS Template ID (e.g. template_xxxxxx)">
+      <div class="setup-hint">
+        Free at <a href="https://www.emailjs.com/" target="_blank">emailjs.com</a>. Connect your Gmail account as a service. Create a template with variables: <strong>{{otp}}</strong>, <strong>{{to_email}}</strong>, <strong>{{user_name}}</strong>.
+      </div>
+    </div>
+
+    <button class="setup-btn" onclick="saveSetup()">Save & Launch VaultDrive →</button>
+    <div class="setup-divider">— or —</div>
+    <div class="skip-setup"><span onclick="skipSetup()">Skip setup — use Demo Mode (no real Google/Gmail)</span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     AUTH WRAP
+══════════════════════════════════════════════ -->
+<div id="authWrap" style="display:none">
+
+  <!-- LOGIN -->
+  <div id="pageLogin" style="display:flex;width:100%;min-height:100vh">
+    <div class="auth-panel-left">
+      <div class="mesh"></div>
+      <div class="auth-brand">
+        <div class="auth-logo-mark">🗄</div>
+        <h1>Vault<br>Drive</h1>
+        <p class="tagline">Your private cloud — every file, every format, every user. Shared the right way.</p>
+      </div>
+      <div class="feature-list">
+        <div class="feat"><div class="feat-icon">🔐</div><div class="feat-body"><strong>Google Account Login</strong>Sign in with your real Google account — zero passwords to remember.</div></div>
+        <div class="feat"><div class="feat-icon">🌐</div><div class="feat-body"><strong>Public + Private Files</strong>Browse anyone's public files or keep yours private.</div></div>
+        <div class="feat"><div class="feat-icon">📧</div><div class="feat-body"><strong>OTP to Your Gmail</strong>Password reset sends a real one-time code to your inbox.</div></div>
+      </div>
+    </div>
+    <div class="auth-panel-right">
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <h2>Sign in</h2>
+          <p>Access your vault</p>
+        </div>
+
+        <!-- Google Sign-In -->
+        <div id="googleBtnWrap">
+          <button class="google-btn-custom" onclick="triggerGoogleLogin()">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Continue with Google
+          </button>
+        </div>
+        <!-- Hidden Google identity div -->
+        <div id="g_id_onload" data-auto_prompt="false" style="display:none"></div>
+
+        <div class="auth-divider"><span>or sign in with email</span></div>
+
+        <div class="fg">
+          <label class="fl">Email</label>
+          <input class="fi" id="liEmail" type="email" placeholder="you@example.com" autocomplete="email">
+          <div class="fe" id="liEmailErr">Enter a valid email.</div>
+        </div>
+        <div class="fg">
+          <label class="fl">Password</label>
+          <div class="fi-wrap">
+            <input class="fi" id="liPass" type="password" placeholder="••••••••" autocomplete="current-password">
+            <span class="eye" onclick="toggleEye('liPass',this)">👁</span>
+          </div>
+          <div class="fe" id="liPassErr">Incorrect password.</div>
+        </div>
+        <div class="fw-link" onclick="showAuth('pageForgot')">Forgot password?</div>
+        <button class="btn-main" onclick="doEmailLogin()">Sign In →</button>
+        <div class="auth-foot">No account? <a onclick="showAuth('pageRegister')">Create one free</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="pageRegister" style="display:none;width:100%;min-height:100vh;flex-direction:row" class="auth-panel-left" style="">
+    <!-- Reuse left panel inline for register -->
+    <div class="auth-panel-left" style="display:flex">
+      <div class="mesh"></div>
+      <div class="auth-brand">
+        <div class="auth-logo-mark">🗄</div>
+        <h1>Join<br>Vault<br>Drive</h1>
+        <p class="tagline">Create your account and start storing files privately — or share with the world.</p>
+      </div>
+    </div>
+    <div class="auth-panel-right">
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <h2>Create account</h2>
+          <p>Start your free vault today</p>
+        </div>
+        <div id="googleBtnWrap2">
+          <button class="google-btn-custom" onclick="triggerGoogleLogin()">
+            <svg width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Sign up with Google
+          </button>
+        </div>
+        <div class="auth-divider"><span>or register with email</span></div>
+        <div class="form-row-2">
+          <div class="fg"><label class="fl">First Name</label><input class="fi" id="rgFirst" placeholder="Ada"><div class="fe" id="rgFirstErr">Required.</div></div>
+          <div class="fg"><label class="fl">Last Name</label><input class="fi" id="rgLast" placeholder="Lovelace"></div>
+        </div>
+        <div class="fg"><label class="fl">Email</label><input class="fi" id="rgEmail" type="email" placeholder="you@example.com"><div class="fe" id="rgEmailErr">Valid email required.</div></div>
+        <div class="fg">
+          <label class="fl">Password</label>
+          <div class="fi-wrap"><input class="fi" id="rgPass" type="password" placeholder="Min 8 chars + number" oninput="pwStrength(this.value)"><span class="eye" onclick="toggleEye('rgPass',this)">👁</span></div>
+          <div class="pw-strength"><div class="pw-strength-fill" id="pwBar"></div></div>
+          <div class="fe" id="rgPassErr">Min 8 chars with a number.</div>
+        </div>
+        <div class="fg"><label class="fl">Confirm Password</label><input class="fi" id="rgConf" type="password" placeholder="Repeat password"><div class="fe" id="rgConfErr">Passwords don't match.</div></div>
+        <button class="btn-main" onclick="doRegister()">Create Account →</button>
+        <div class="auth-foot">Have an account? <a onclick="showAuth('pageLogin')">Sign in</a></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORGOT PASSWORD -->
+  <div id="pageForgot" style="display:none;width:100%;min-height:100vh">
+    <div class="auth-panel-left">
+      <div class="mesh"></div>
+      <div class="auth-brand">
+        <div class="auth-logo-mark">🔑</div>
+        <h1>Reset<br>Access</h1>
+        <p class="tagline">We'll send a 6-digit OTP to your Gmail inbox to verify it's you.</p>
+      </div>
+    </div>
+    <div class="auth-panel-right">
+      <!-- Step 1 -->
+      <div class="auth-card" id="fgStep1">
+        <div class="auth-card-head"><h2>Forgot password?</h2><p>Enter your registered email address</p></div>
+        <div class="fg"><label class="fl">Email Address</label><input class="fi" id="fgEmail" type="email" placeholder="you@example.com"><div class="fe" id="fgEmailErr">No account with this email.</div></div>
+        <button class="btn-main" id="fgSendBtn" onclick="doForgotSend()">Send OTP to Gmail →</button>
+        <div class="auth-foot"><a onclick="showAuth('pageLogin')">← Back to Sign In</a></div>
+      </div>
+      <!-- Step 2 OTP -->
+      <div class="auth-card" id="fgStep2" style="display:none">
+        <div class="auth-card-head">
+          <h2>Check your Gmail</h2>
+          <p>We sent a 6-digit code to <strong id="fgEmailShow" style="color:var(--amber)"></strong></p>
+        </div>
+        <div id="demoOtpBox" style="display:none;background:#f59e0b18;border:1px solid #f59e0b30;border-radius:var(--r);padding:12px 16px;margin-bottom:16px;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;text-align:center;color:var(--amber)"></div>
+        <div class="otp-row" id="otpInputs">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,0)">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,1)">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,2)">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,3)">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,4)">
+          <input class="otp-box" maxlength="1" oninput="otpAdvance(this,5)">
+        </div>
+        <div class="fe on" id="fgOtpErr" style="text-align:center;display:none">Wrong code — try again.</div>
+        <button class="btn-main" style="margin-top:16px" onclick="doVerifyOtp()">Verify Code →</button>
+        <div class="auth-foot"><a onclick="doForgotSend()">Resend OTP</a> &nbsp;·&nbsp; <a onclick="showAuth('pageLogin')">Cancel</a></div>
+      </div>
+      <!-- Step 3 new password -->
+      <div class="auth-card" id="fgStep3" style="display:none">
+        <div class="auth-card-head"><h2>New password</h2><p>Set a strong new password for your vault</p></div>
+        <div class="fg"><label class="fl">New Password</label><div class="fi-wrap"><input class="fi" id="np1" type="password" placeholder="Min 8 characters"><span class="eye" onclick="toggleEye('np1',this)">👁</span></div></div>
+        <div class="fg"><label class="fl">Confirm</label><input class="fi" id="np2" type="password" placeholder="Repeat password"><div class="fe" id="npErr">Passwords don't match or too short.</div></div>
+        <button class="btn-main" onclick="doResetPassword()">Save New Password →</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /authWrap -->
+
+<!-- ══════════════════════════════════════════════
+     APP SHELL
+══════════════════════════════════════════════ -->
+<div id="appShell">
+  <header class="topnav">
+    <div class="tn-logo">
+      <div class="tn-logo-box">🗄</div>
+      <span class="tn-logo-text">VaultDrive</span>
+    </div>
+    <div class="tn-search">
+      <span style="color:var(--mist);font-size:15px">⌕</span>
+      <input type="text" placeholder="Search all files…" id="searchIn" oninput="renderFiles()">
+    </div>
+    <div class="tn-right">
+      <div class="view-pill">
+        <button class="vp-btn on" id="vpMine" onclick="setScope('mine',this)">My Files</button>
+        <button class="vp-btn" id="vpAll" onclick="setScope('all',this)">Everyone's</button>
+      </div>
+      <button class="icon-btn-nav" title="Shared with me" onclick="openSharedModal()">📥</button>
+      <div class="avatar-wrap">
+        <button class="avatar" id="topAvatar" onclick="toggleDropdown()"></button>
+        <div class="user-dropdown" id="userDropdown">
+          <div class="ud-head">
+            <div class="ud-avatar" id="ddAvatar"></div>
+            <div><div class="ud-name" id="ddName"></div><div class="ud-email" id="ddEmail"></div></div>
+          </div>
+          <div class="ud-item" onclick="closeDropdown();openProfileModal()">👤 Profile</div>
+          <div class="ud-item" onclick="closeDropdown();openSharedModal()">📥 Shared with me</div>
+          <div class="ud-sep"></div>
+          <div class="ud-item red" onclick="doLogout()">🚪 Sign Out</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-body">
+    <aside class="sidebar">
+      <div class="sb-section">
+        <div class="sb-label">My Drive</div>
+        <div class="sb-item on" id="sAll" onclick="setNav('all')">📁 All Files <span class="sb-count" id="cnt-all">0</span></div>
+        <div class="sb-item" id="sRecent" onclick="setNav('recent')">🕐 Recent</div>
+        <div class="sb-item" id="sStarred" onclick="setNav('starred')">⭐ Starred <span class="sb-count" id="cnt-starred">0</span></div>
+        <div class="sb-item" id="sShared" onclick="setNav('shared')">🔗 Shared Out <span class="sb-count" id="cnt-shared">0</span></div>
+      </div>
+      <div class="sb-section">
+        <div class="sb-label">By Type</div>
+        <div class="sb-item" id="sImages" onclick="setNav('images')">🖼 Images <span class="sb-count" id="cnt-images">0</span></div>
+        <div class="sb-item" id="sDocs" onclick="setNav('documents')">📄 Documents <span class="sb-count" id="cnt-docs">0</span></div>
+        <div class="sb-item" id="sVideos" onclick="setNav('videos')">🎬 Videos <span class="sb-count" id="cnt-videos">0</span></div>
+        <div class="sb-item" id="sAudio" onclick="setNav('audio')">🎵 Audio <span class="sb-count" id="cnt-audio">0</span></div>
+        <div class="sb-item" id="sArchives" onclick="setNav('archives')">📦 Archives <span class="sb-count" id="cnt-archives">0</span></div>
+      </div>
+      <div style="flex:1"></div>
+      <div class="storage-box">
+        <div class="sb-r"><span>Storage</span><strong id="sbVal">0 B</strong></div>
+        <div class="sb-track"><div class="sb-fill" id="sbFill" style="width:0%"></div></div>
+        <div style="font-size:11px;color:var(--mist);margin-top:6px" id="sbSub">of browser quota</div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="content-bar">
+        <div class="content-title" id="ctTitle">All Files</div>
+        <div class="view-toggle">
+          <button class="vt on" id="vtGrid" onclick="setView('grid')">⊞</button>
+          <button class="vt" id="vtList" onclick="setView('list')">☰</button>
+        </div>
+        <button class="btn-upload" onclick="document.getElementById('fileIn').click()">＋ Upload</button>
+        <input type="file" id="fileIn" multiple style="display:none" onchange="handleUpload(this.files)">
+      </div>
+
+      <div class="content-body">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileIn').click()">
+          <div class="dz-icon">☁</div>
+          <h4>Drop files here or click to upload</h4>
+          <p>Any format · Files stored in your browser · Share with any user</p>
+        </div>
+
+        <!-- Scope notice -->
+        <div class="public-notice" id="publicNotice" style="display:none">
+          🌐 <span><strong>Public mode:</strong> Browsing files uploaded by all users. You can download public files.</span>
+        </div>
+
+        <div class="chips">
+          <button class="chip on" onclick="setSort('name',this)">Name</button>
+          <button class="chip" onclick="setSort('date',this)">Newest</button>
+          <button class="chip" onclick="setSort('size',this)">Largest</button>
+          <button class="chip" onclick="setSort('type',this)">Type</button>
+        </div>
+
+        <div class="meta-row">
+          <span class="meta-count" id="metaCount">0 files</span>
+        </div>
+
+        <div id="filesOut"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     MODALS
+══════════════════════════════════════════════ -->
+
+<!-- Delete -->
+<div class="modal-bg" id="modalDelete">
+  <div class="modal" style="max-width:400px">
+    <button class="modal-x" onclick="closeModal('modalDelete')">✕</button>
+    <h3>Delete file?</h3>
+    <p id="deleteText">This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn-c" onclick="closeModal('modalDelete')">Cancel</button>
+      <button class="btn-del" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rename -->
+<div class="modal-bg" id="modalRename">
+  <div class="modal" style="max-width:380px">
+    <button class="modal-x" onclick="closeModal('modalRename')">✕</button>
+    <h3>Rename</h3>
+    <p>Enter a new name for this file.</p>
+    <div class="fg"><label class="fl">File Name</label><input class="fi" id="renameIn" type="text"></div>
+    <div class="modal-actions">
+      <button class="btn-c" onclick="closeModal('modalRename')">Cancel</button>
+      <button class="btn-ok" onclick="confirmRename()">Rename</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share -->
+<div class="modal-bg" id="modalShare">
+  <div class="modal">
+    <button class="modal-x" onclick="closeModal('modalShare')">✕</button>
+    <h3>🔗 Share File</h3>
+    <p id="shareFileName" style="font-weight:700;color:var(--snow);margin-bottom:14px"></p>
+    <div class="modal-body">
+      <div class="sec-label">Shareable Link</div>
+      <div class="share-link-row">
+        <input class="share-link-inp" id="shareLinkVal" readonly>
+        <button class="btn-copy" onclick="copyLink()">Copy</button>
+      </div>
+
+      <div class="sec-label" style="margin-top:14px">Add User by Email</div>
+      <div class="share-add-row">
+        <input class="share-email-in" type="email" id="shareEmailIn" placeholder="user@example.com">
+        <button class="btn-mint" onclick="doShareAdd()">+ Add</button>
+      </div>
+      <div class="fe" id="shareErr" style="margin-top:5px">User not found in VaultDrive.</div>
+
+      <div id="shareUserList" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared with me -->
+<div class="modal-bg" id="modalShared">
+  <div class="modal" style="max-width:560px">
+    <button class="modal-x" onclick="closeModal('modalShared')">✕</button>
+    <h3>📥 Shared with Me</h3>
+    <p>Files other users have shared directly with your account.</p>
+    <div class="modal-body" id="sharedMeBody"></div>
+  </div>
+</div>
+
+<!-- Profile -->
+<div class="modal-bg" id="modalProfile">
+  <div class="modal" style="max-width:400px">
+    <button class="modal-x" onclick="closeModal('modalProfile')">✕</button>
+    <h3>My Profile</h3>
+    <p>Your VaultDrive account details.</p>
+    <div style="background:var(--ink4);border:1px solid var(--rim2);border-radius:var(--r2);padding:18px;margin-bottom:16px;display:flex;align-items:center;gap:16px">
+      <div style="width:60px;height:60px;border-radius:16px;overflow:hidden;flex-shrink:0;background:linear-gradient(135deg,var(--amber),var(--coral));display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#000" id="profAvatar"></div>
+      <div>
+        <div style="font-size:18px;font-weight:800;font-family:'Fraunces',serif" id="profName"></div>
+        <div style="font-size:12px;color:var(--fog);font-family:'JetBrains Mono',monospace;margin-top:3px" id="profEmail"></div>
+        <div style="font-size:11px;color:var(--mist);margin-top:4px" id="profJoined"></div>
+        <div style="font-size:11px;color:var(--mint);margin-top:2px;font-weight:600" id="profMethod"></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-c" onclick="closeModal('modalProfile')">Close</button>
+      <button class="btn-del" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="ctx" id="ctxMenu">
+  <div class="ctx-i" onclick="ctxDo('download')">⬇ Download</div>
+  <div class="ctx-i" onclick="ctxDo('star')">⭐ Toggle Star</div>
+  <div class="ctx-i" onclick="ctxDo('share')">🔗 Share</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-i" onclick="ctxDo('rename')">✏ Rename</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-i red" onclick="ctxDo('delete')">🗑 Delete</div>
+</div>
+
+<div class="toast-stack" id="toasts"></div>
+
+<!-- ══════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────
+//  CONFIG (populated by setup wizard)
+// ─────────────────────────────────────────────
+let CFG = { googleClientId:'', ejPublic:'', ejService:'', ejTemplate:'', demoMode:false };
+
+function loadCfg() {
+  try { const c = JSON.parse(localStorage.getItem('vd_cfg')); if(c) CFG = c; } catch(e){}
+}
+function saveCfg() { localStorage.setItem('vd_cfg',JSON.stringify(CFG)); }
+
+function saveSetup() {
+  CFG.googleClientId = document.getElementById('setupGoogleId').value.trim();
+  CFG.ejPublic       = document.getElementById('setupEmailjsPublic').value.trim();
+  CFG.ejService      = document.getElementById('setupEmailjsService').value.trim();
+  CFG.ejTemplate     = document.getElementById('setupEmailjsTemplate').value.trim();
+  CFG.demoMode       = false;
+  saveCfg();
+  initApp();
+}
+function skipSetup() {
+  CFG.demoMode = true; saveCfg(); initApp();
+}
+
+// ─────────────────────────────────────────────
+//  DATABASE
+// ─────────────────────────────────────────────
+const DB = {
+  getUsers(){    try{return JSON.parse(localStorage.getItem('vd_u')||'[]')}catch(e){return[]} },
+  saveUsers(u){  localStorage.setItem('vd_u',JSON.stringify(u)) },
+  findByEmail(e){ return this.getUsers().find(u=>u.email.toLowerCase()===e.toLowerCase()) },
+  findById(id){   return this.getUsers().find(u=>u.id===id) },
+  upsertUser(data){
+    const users=this.getUsers();
+    let u=users.find(x=>x.email.toLowerCase()===data.email.toLowerCase());
+    if(u){ Object.assign(u,data); this.saveUsers(users); return u; }
+    u={id:uid(),joined:new Date().toISOString(),...data};
+    users.push(u); this.saveUsers(users); return u;
+  },
+  updatePw(email,pw){
+    const users=this.getUsers(),idx=users.findIndex(u=>u.email.toLowerCase()===email.toLowerCase());
+    if(idx>-1){users[idx].pwHash=hash(pw);this.saveUsers(users);return true}return false;
+  },
+
+  getFiles(){    try{return JSON.parse(localStorage.getItem('vd_f')||'[]')}catch(e){return[]} },
+  saveFiles(f){  localStorage.setItem('vd_f',JSON.stringify(f)) },
+  myFiles(uid){  return this.getFiles().filter(f=>f.ownerId===uid) },
+  allFiles(){    return this.getFiles() },
+  sharedWith(uid){return this.getFiles().filter(f=>f.ownerId!==uid&&(f.sharedWith||[]).includes(uid))},
+  addFile(f){    const fs=this.getFiles();fs.unshift(f);this.saveFiles(fs) },
+  patchFile(id,p){ const fs=this.getFiles(),i=fs.findIndex(f=>f.id===id);if(i>-1){Object.assign(fs[i],p);this.saveFiles(fs)} },
+  delFile(id){   this.saveFiles(this.getFiles().filter(f=>f.id!==id)) },
+  getFile(id){   return this.getFiles().find(f=>f.id===id) },
+
+  getSession(){  try{return JSON.parse(sessionStorage.getItem('vd_s'))}catch(e){return null} },
+  setSession(u){ sessionStorage.setItem('vd_s',JSON.stringify(u)) },
+  clearSession(){ sessionStorage.removeItem('vd_s') },
+};
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,8) }
+function hash(s){ let h=0;for(let i=0;i<s.length;i++){h=((h<<5)-h)+s.charCodeAt(i);h|=0}return h.toString(16) }
+function fmtSz(b){ if(b<1024)return b+' B';if(b<1<<20)return(b>>10)+' KB';if(b<1<<30)return(b/(1<<20)).toFixed(1)+' MB';return(b/(1<<30)).toFixed(2)+' GB' }
+function fmtDt(iso){ const d=new Date(iso),n=new Date(),s=(n-d)/1000;if(s<60)return'just now';if(s<3600)return~~(s/60)+'m ago';if(s<86400)return~~(s/3600)+'h ago';if(s<604800)return~~(s/86400)+'d ago';return d.toLocaleDateString('en',{month:'short',day:'numeric',year:'numeric'}) }
+function filecat(mime,name){
+  const e=(name||'').split('.').pop().toLowerCase();
+  if(mime.startsWith('image/'))return'images';
+  if(mime.startsWith('video/'))return'videos';
+  if(mime.startsWith('audio/'))return'audio';
+  if(['pdf','doc','docx','txt','md','xls','xlsx','ppt','pptx','csv','rtf','odt','pages','numbers','key'].includes(e))return'documents';
+  if(['zip','rar','tar','gz','7z','bz2','dmg'].includes(e))return'archives';
+  if(mime.startsWith('text/'))return'documents';
+  return'other';
+}
+function fileicon(mime,name){
+  const c=filecat(mime,name);
+  if(c==='images')return'🖼';if(c==='videos')return'🎬';if(c==='audio')return'🎵';if(c==='archives')return'📦';
+  const m={pdf:'📕',doc:'📘',docx:'📘',txt:'📝',md:'📝',xls:'📗',xlsx:'📗',ppt:'📙',pptx:'📙',csv:'📊'};
+  return m[(name||'').split('.').pop().toLowerCase()]||'📎';
+}
+function catclr(c){ return{images:'#34d399',videos:'#38bdf8',audio:'#fb7185',documents:'#f59e0b',archives:'#f97316',other:'#a78bfa'}[c]||'#5c5b7a' }
+function toast(msg,type='ok',ms=3000){
+  const ico={ok:'✅',err:'❌',inf:'ℹ️'};
+  const el=document.createElement('div');el.className=`toast ${type}`;
+  el.innerHTML=`<span>${ico[type]}</span><span>${msg}</span>`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(),ms);
+}
+function avatarBg(){ return'linear-gradient(135deg,#f59e0b,#fb7185)' }
+function initials(name){ if(!name)return'?';const p=name.trim().split(' ');return(p[0][0]+(p[1]?p[1][0]:'')).toUpperCase() }
+
+// ─────────────────────────────────────────────
+//  AUTH PAGES
+// ─────────────────────────────────────────────
+function showAuth(pageId){
+  ['pageLogin','pageRegister','pageForgot'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  const target=document.getElementById(pageId);
+  if(target) target.style.display='flex';
+}
+
+function toggleEye(id,el){ const i=document.getElementById(id);i.type=i.type==='password'?'text':'password';el.textContent=i.type==='password'?'👁':'🙈'; }
+function pwStrength(pw){
+  let s=0;if(pw.length>=8)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;
+  const bar=document.getElementById('pwBar');
+  bar.style.width=(s*25)+'%';
+  bar.style.background=['#fb7185','#f97316','#f59e0b','#34d399'][s-1]||'#fb7185';
+}
+function clrErr(){ document.querySelectorAll('.fe').forEach(e=>{e.classList.remove('on');e.style.display='none'});document.querySelectorAll('.fi').forEach(e=>e.classList.remove('err')); }
+function showErr(id,msg){ const el=document.getElementById(id);if(el){if(msg)el.textContent=msg;el.classList.add('on');el.style.display='block'} }
+
+// ── Email login ──────────────────────────────
+function doEmailLogin(){
+  clrErr();
+  const email=document.getElementById('liEmail').value.trim();
+  const pw=document.getElementById('liPass').value;
+  if(!email||!email.includes('@')){ showErr('liEmailErr'); return; }
+  const user=DB.findByEmail(email);
+  if(!user||user.pwHash!==hash(pw)){ showErr('liPassErr','Incorrect email or password.'); return; }
+  DB.setSession(user); launchApp(user);
+}
+
+// ── Register ─────────────────────────────────
+function doRegister(){
+  clrErr();
+  const first=document.getElementById('rgFirst').value.trim();
+  const last=document.getElementById('rgLast').value.trim();
+  const email=document.getElementById('rgEmail').value.trim();
+  const pw=document.getElementById('rgPass').value;
+  const conf=document.getElementById('rgConf').value;
+  let ok=true;
+  if(!first){ showErr('rgFirstErr'); ok=false; }
+  if(!email||!email.includes('@')){ showErr('rgEmailErr'); ok=false; }
+  if(pw.length<8||!/[0-9]/.test(pw)){ showErr('rgPassErr'); ok=false; }
+  if(pw!==conf){ showErr('rgConfErr'); ok=false; }
+  if(!ok) return;
+  if(DB.findByEmail(email)){ showErr('rgEmailErr','Email already registered.'); return; }
+  const user=DB.upsertUser({email:email.toLowerCase(),firstName:first,lastName:last,pwHash:hash(pw),method:'email'});
+  DB.setSession(user); toast(`Welcome, ${first}! 🎉`,'ok'); launchApp(user);
+}
+
+// ── Google OAuth ──────────────────────────────
+let googleReady=false;
+function initGoogleOAuth(){
+  if(!CFG.googleClientId||CFG.demoMode){ return; }
+  window.google?.accounts.id.initialize({
+    client_id: CFG.googleClientId,
+    callback: handleGoogleCallback,
+    auto_select: false,
+  });
+  googleReady=true;
+}
+function triggerGoogleLogin(){
+  if(!googleReady||CFG.demoMode){
+    toast('Google OAuth not configured — use email login or set up in ⚙','inf',5000);
+    return;
+  }
+  google.accounts.id.prompt();
+}
+function handleGoogleCallback(response){
+  // Decode JWT payload (base64)
+  const payload=JSON.parse(atob(response.credential.split('.')[1]));
+  const user=DB.upsertUser({
+    email: payload.email.toLowerCase(),
+    firstName: payload.given_name||payload.name.split(' ')[0],
+    lastName: payload.family_name||'',
+    googlePicture: payload.picture||'',
+    method: 'google',
+  });
+  DB.setSession(user); launchApp(user);
+}
+
+// ── Forgot / OTP ──────────────────────────────
+let fgEmail='', fgOTP='';
+
+async function doForgotSend(){
+  clrErr();
+  const email=document.getElementById('fgEmail').value.trim();
+  if(!DB.findByEmail(email)){ showErr('fgEmailErr'); return; }
+  fgEmail=email;
+  fgOTP=String(Math.floor(100000+Math.random()*900000));
+  document.getElementById('fgEmailShow').textContent=email;
+
+  const btn=document.getElementById('fgSendBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spin"></span> Sending…';
+
+  if(!CFG.demoMode && CFG.ejPublic && CFG.ejService && CFG.ejTemplate){
+    // Real EmailJS send
+    try{
+      emailjs.init(CFG.ejPublic);
+      await emailjs.send(CFG.ejService, CFG.ejTemplate,{
+        to_email: email,
+        otp: fgOTP,
+        user_name: DB.findByEmail(email)?.firstName||'there',
+      });
+      document.getElementById('demoOtpBox').style.display='none';
+      toast(`OTP sent to ${email} 📧`,'ok');
+    }catch(err){
+      console.error(err);
+      toast('EmailJS error — showing OTP on screen instead.','err');
+      showDemoOtp();
+    }
+  } else {
+    // Demo mode — show OTP on screen
+    showDemoOtp();
+    toast('Demo mode: OTP shown on screen (no real email sent)','inf',6000);
+  }
+
+  btn.disabled=false; btn.innerHTML='Send OTP to Gmail →';
+  document.getElementById('fgStep1').style.display='none';
+  document.getElementById('fgStep2').style.display='block';
+  // clear otp inputs
+  document.querySelectorAll('.otp-box').forEach(b=>b.value='');
+}
+
+function showDemoOtp(){
+  const box=document.getElementById('demoOtpBox');
+  box.style.display='block';
+  box.textContent='Your OTP: '+fgOTP;
+}
+
+function otpAdvance(el,idx){
+  el.value=el.value.replace(/\D/,'');
+  const boxes=document.querySelectorAll('.otp-box');
+  if(el.value&&idx<5) boxes[idx+1].focus();
+}
+function doVerifyOtp(){
+  const boxes=document.querySelectorAll('.otp-box');
+  const code=[...boxes].map(b=>b.value).join('');
+  const errEl=document.getElementById('fgOtpErr');
+  if(code!==fgOTP){ errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  document.getElementById('fgStep2').style.display='none';
+  document.getElementById('fgStep3').style.display='block';
+}
+function doResetPassword(){
+  const p1=document.getElementById('np1').value;
+  const p2=document.getElementById('np2').value;
+  if(p1.length<8||p1!==p2){ showErr('npErr'); return; }
+  DB.updatePw(fgEmail,p1);
+  toast('Password updated! Sign in with your new password.','ok');
+  showAuth('pageLogin');
+  document.getElementById('fgStep1').style.display='block';
+  document.getElementById('fgStep2').style.display='none';
+  document.getElementById('fgStep3').style.display='none';
+}
+
+// ─────────────────────────────────────────────
+//  APP STATE
+// ─────────────────────────────────────────────
+let me=null, nav='all', view='grid', sort='name', scope='mine';
+let ctxId=null, delId=null, renId=null, shrId=null;
+
+function launchApp(user){
+  me=user;
+  document.getElementById('authWrap').style.display='none';
+  document.getElementById('appShell').classList.add('on');
+  updateTopbar();
+  renderFiles(); updateStats();
+}
+
+function updateTopbar(){
+  const av=document.getElementById('topAvatar');
+  const ddAv=document.getElementById('ddAvatar');
+  if(me.googlePicture){
+    av.innerHTML=`<img src="${me.googlePicture}" alt="">`;
+    ddAv.innerHTML=`<img src="${me.googlePicture}" alt="">`;
+  } else {
+    const ini=initials(me.firstName+' '+me.lastName);
+    av.textContent=ini; ddAv.textContent=ini;
+  }
+  document.getElementById('ddName').textContent=me.firstName+' '+(me.lastName||'');
+  document.getElementById('ddEmail').textContent=me.email;
+}
+
+function doLogout(){
+  DB.clearSession(); me=null;
+  document.getElementById('appShell').classList.remove('on');
+  document.getElementById('authWrap').style.display='flex';
+  closeDropdown();
+  ['modalDelete','modalRename','modalShare','modalShared','modalProfile'].forEach(closeModal);
+  hideCtx();
+  showAuth('pageLogin');
+  toast('Signed out.','inf');
+}
+
+// ─────────────────────────────────────────────
+//  UPLOAD
+// ─────────────────────────────────────────────
+function handleUpload(fileList){
+  if(!me) return;
+  let done=0;
+  Array.from(fileList).forEach(file=>{
+    if(file.size>100*1024*1024){ toast(file.name+' too large (>100MB)','err'); return; }
+    const reader=new FileReader();
+    reader.onload=e=>{
+      DB.addFile({ id:uid(), ownerId:me.id, name:file.name, size:file.size, type:file.type||'application/octet-stream', date:new Date().toISOString(), starred:false, sharedWith:[], dataURL:e.target.result });
+      done++;
+      if(done===fileList.length){ toast(`${done} file${done>1?'s':''} uploaded!`,'ok'); renderFiles(); updateStats(); }
+    };
+    reader.readAsDataURL(file);
+  });
+  document.getElementById('fileIn').value='';
+}
+
+// ─────────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────────
+function getFiles(){
+  if(!me) return [];
+  const q=document.getElementById('searchIn').value.toLowerCase();
+  let files = scope==='all' ? DB.allFiles() : DB.myFiles(me.id);
+  if(nav==='recent'){ const c=Date.now()-7*864e5; files=files.filter(f=>new Date(f.date)>c); }
+  else if(nav==='starred'){ files=files.filter(f=>f.starred); }
+  else if(nav==='shared'){ files=files.filter(f=>(f.sharedWith||[]).length>0); }
+  else if(['images','videos','audio','documents','archives'].includes(nav)){ files=files.filter(f=>filecat(f.type,f.name)===nav); }
+  if(q) files=files.filter(f=>f.name.toLowerCase().includes(q)||(f.ownerName||'').toLowerCase().includes(q));
+  files.sort((a,b)=>{
+    if(sort==='name')return a.name.localeCompare(b.name);
+    if(sort==='date')return new Date(b.date)-new Date(a.date);
+    if(sort==='size')return b.size-a.size;
+    if(sort==='type')return filecat(a.type,a.name).localeCompare(filecat(b.type,b.name));
+    return 0;
+  });
+  return files;
+}
+
+function ownerLabel(f){
+  if(f.ownerId===me?.id) return '';
+  const owner=DB.findById(f.ownerId);
+  return owner ? owner.firstName+' '+owner.lastName : 'Unknown';
+}
+
+function renderFiles(){
+  const files=getFiles();
+  document.getElementById('metaCount').textContent=files.length+' file'+(files.length!==1?'s':'');
+  const out=document.getElementById('filesOut');
+  document.getElementById('publicNotice').style.display=scope==='all'?'flex':'none';
+
+  if(!files.length){
+    const myCount=DB.myFiles(me?.id||'').length;
+    out.innerHTML=`<div class="empty"><div class="empty-icon">${myCount?'🔍':'☁'}</div><h3>${myCount?'No results':'Your vault is empty'}</h3><p>${myCount?'Try a different search.':'Click Upload to add your first file.'}</p></div>`;
+    return;
+  }
+  if(view==='grid'){
+    out.innerHTML=`<div class="grid">${files.map(cardHTML).join('')}</div>`;
+  } else {
+    out.innerHTML=`
+      <div style="display:flex;align-items:center;gap:12px;padding:5px 12px;font-size:10px;color:var(--mist);font-family:'JetBrains Mono',monospace;margin-bottom:4px">
+        <div style="width:20px"></div><div style="flex:1">Name</div>
+        <div style="width:75px;text-align:right">Size</div>
+        <div style="width:90px;text-align:right">Date</div>
+        <div style="width:110px"></div>
+      </div>
+      <div class="list">${files.map(rowHTML).join('')}</div>`;
+  }
+}
+
+function isOwn(f){ return f.ownerId===me?.id; }
+
+function cardHTML(f){
+  const c=filecat(f.type,f.name), clr=catclr(c), isImg=c==='images';
+  const thumb=isImg?`<div class="fc-thumb"><img src="${f.dataURL}" onerror="this.parentElement.innerHTML='🖼'"></div>`:`<div class="fc-thumb">${fileicon(f.type,f.name)}</div>`;
+  const own=isOwn(f);
+  const sharedLbl=own&&(f.sharedWith||[]).length?`<span class="fc-tag" style="background:#34d39918;color:var(--mint);border:1px solid #34d39928">Shared</span>`:`<span class="fc-tag" style="background:${clr}15;color:${clr}">${c}</span>`;
+  const ownerLbl=!own?`<div class="fc-owner">by ${ownerLabel(f)}</div>`:'';
+  const actions=own
+    ?`<div class="fc-actions"><button class="fa-btn" onclick="event.stopPropagation();dlFile('${f.id}')">⬇</button><button class="fa-btn" onclick="event.stopPropagation();openShare('${f.id}')">🔗</button><button class="fa-btn r" onclick="event.stopPropagation();promptDelete('${f.id}')">🗑</button></div>`
+    :`<div class="fc-actions"><button class="fa-btn" onclick="event.stopPropagation();dlFile('${f.id}')">⬇ Download</button></div>`;
+  return `<div class="fcard" oncontextmenu="${own?`showCtx(event,'${f.id}')`:'event.preventDefault()'}" title="${f.name}">
+    ${f.starred&&own?'<div class="fc-starred">⭐</div>':''}
+    ${sharedLbl}
+    ${thumb}
+    <div class="fc-name">${f.name}</div>
+    <div class="fc-sub">${fmtSz(f.size)} · ${fmtDt(f.date)}</div>
+    ${ownerLbl}
+    ${actions}
+  </div>`;
+}
+
+function rowHTML(f){
+  const c=filecat(f.type,f.name),clr=catclr(c);
+  const own=isOwn(f);
+  const shLbl=own&&(f.sharedWith||[]).length?`<span class="shared-lbl">shared ${f.sharedWith.length}</span>`:'';
+  const ownerLbl=!own?`<span class="fr-owner-lbl">by ${ownerLabel(f)}</span>`:'';
+  const acts=own
+    ?`<div class="fr-acts"><button class="fr-btn" onclick="dlFile('${f.id}')">⬇</button><button class="fr-btn" onclick="openShare('${f.id}')">🔗</button><button class="fr-btn" onclick="toggleStar('${f.id}')">⭐</button><button class="fr-btn r" onclick="promptDelete('${f.id}')">🗑</button></div>`
+    :`<div class="fr-acts"><button class="fr-btn" onclick="dlFile('${f.id}')">⬇ Download</button></div>`;
+  return `<div class="frow" oncontextmenu="${own?`showCtx(event,'${f.id}')`:'event.preventDefault()'}">
+    <div class="fr-ic">${fileicon(f.type,f.name)}</div>
+    <div class="fr-info">
+      <div class="fr-name">${f.starred&&own?'⭐ ':''} ${f.name}</div>
+      <div class="fr-meta"><span style="color:${clr}">${c}</span> ${ownerLbl}</div>
+    </div>
+    ${shLbl}
+    <div class="fr-sz">${fmtSz(f.size)}</div>
+    <div class="fr-dt">${fmtDt(f.date)}</div>
+    ${acts}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+//  STATS / SIDEBAR
+// ─────────────────────────────────────────────
+function updateStats(){
+  if(!me) return;
+  const my=DB.myFiles(me.id);
+  const total=my.reduce((s,f)=>s+f.size,0);
+  document.getElementById('sbVal').textContent=fmtSz(total);
+  document.getElementById('sbFill').style.width=Math.min(total/(100*1024*1024)*100,100)+'%';
+  const c=(id,n)=>{const el=document.getElementById(id);if(el)el.textContent=n};
+  c('cnt-all',my.length);
+  c('cnt-starred',my.filter(f=>f.starred).length);
+  c('cnt-shared',my.filter(f=>(f.sharedWith||[]).length>0).length);
+  ['images','documents','videos','audio','archives'].forEach(t=>{
+    const ids={images:'cnt-images',documents:'cnt-docs',videos:'cnt-videos',audio:'cnt-audio',archives:'cnt-archives'};
+    c(ids[t],my.filter(f=>filecat(f.type,f.name)===t).length);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  NAVIGATION
+// ─────────────────────────────────────────────
+const navLabels={all:'All Files',recent:'Recent',starred:'Starred',shared:'Shared Out',images:'Images',documents:'Documents',videos:'Videos',audio:'Audio',archives:'Archives'};
+const navIds={all:'sAll',recent:'sRecent',starred:'sStarred',shared:'sShared',images:'sImages',documents:'sDocs',videos:'sVideos',audio:'sAudio',archives:'sArchives'};
+
+function setNav(n){
+  nav=n; scope='mine';
+  document.getElementById('vpMine').classList.add('on'); document.getElementById('vpAll').classList.remove('on');
+  document.querySelectorAll('.sb-item').forEach(el=>el.classList.remove('on'));
+  const target=document.getElementById(navIds[n]);if(target)target.classList.add('on');
+  document.getElementById('ctTitle').textContent=navLabels[n]||n;
+  renderFiles();
+}
+function setScope(s,el){
+  scope=s;
+  document.getElementById('vpMine').classList.toggle('on',s==='mine');
+  document.getElementById('vpAll').classList.toggle('on',s==='all');
+  document.getElementById('ctTitle').textContent=s==='all'?'Everyone\'s Files':'All Files';
+  renderFiles();
+}
+function setView(v){
+  view=v;
+  document.getElementById('vtGrid').classList.toggle('on',v==='grid');
+  document.getElementById('vtList').classList.toggle('on',v==='list');
+  renderFiles();
+}
+function setSort(s,el){
+  sort=s;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on'); renderFiles();
+}
+
+// ─────────────────────────────────────────────
+//  FILE ACTIONS
+// ─────────────────────────────────────────────
+function dlFile(id){
+  const f=DB.getFile(id);if(!f)return;
+  const a=document.createElement('a');a.href=f.dataURL;a.download=f.name;a.click();
+}
+function toggleStar(id){
+  const f=DB.getFile(id);if(!f)return;
+  DB.patchFile(id,{starred:!f.starred}); renderFiles(); updateStats();
+}
+function promptDelete(id){
+  const f=DB.getFile(id);if(!f)return;
+  delId=id;
+  document.getElementById('deleteText').textContent=`"${f.name}" will be permanently deleted.`;
+  openModal('modalDelete');
+}
+function confirmDelete(){
+  if(delId){ DB.delFile(delId); delId=null; }
+  closeModal('modalDelete'); renderFiles(); updateStats();
+  toast('File deleted.','ok');
+}
+function openRename(id){
+  const f=DB.getFile(id);if(!f)return;
+  renId=id; document.getElementById('renameIn').value=f.name;
+  openModal('modalRename');
+}
+function confirmRename(){
+  const name=document.getElementById('renameIn').value.trim();
+  if(!name||!renId)return;
+  DB.patchFile(renId,{name}); closeModal('modalRename'); renderFiles();
+  toast('Renamed!','ok');
+}
+
+// ─────────────────────────────────────────────
+//  SHARE
+// ─────────────────────────────────────────────
+function openShare(id){
+  shrId=id; const f=DB.getFile(id);if(!f)return;
+  document.getElementById('shareFileName').textContent=f.name;
+  document.getElementById('shareLinkVal').value=`vaultdrive://f/${f.id}`;
+  document.getElementById('shareEmailIn').value='';
+  document.getElementById('shareErr').style.display='none';
+  renderShareUsers(f); openModal('modalShare'); hideCtx();
+}
+function renderShareUsers(f){
+  const list=document.getElementById('shareUserList');
+  const sw=f.sharedWith||[];
+  if(!sw.length){ list.innerHTML='<div style="color:var(--mist);font-size:13px;padding:10px 0;text-align:center">Not shared with anyone yet.</div>'; return; }
+  list.innerHTML=sw.map(uid=>{
+    const u=DB.findById(uid); if(!u)return'';
+    const bg=['#34d399','#38bdf8','#f59e0b','#a78bfa','#fb7185'][uid.charCodeAt(0)%5];
+    return `<div class="share-user-row">
+      <div class="su-av" style="background:${bg}">${initials(u.firstName+' '+u.lastName)}</div>
+      <div class="su-info"><div class="su-name">${u.firstName} ${u.lastName||''}</div><div class="su-email">${u.email}</div></div>
+      <button class="su-remove" onclick="removeShareUser('${uid}')">Remove</button>
+    </div>`;
+  }).join('');
+}
+function doShareAdd(){
+  const email=document.getElementById('shareEmailIn').value.trim();
+  const errEl=document.getElementById('shareErr');
+  const target=DB.findByEmail(email);
+  if(!target||target.id===me.id){ errEl.textContent='User not found in VaultDrive.'; errEl.style.display='block'; return; }
+  const f=DB.getFile(shrId);if(!f)return;
+  const sw=f.sharedWith||[];
+  if(sw.includes(target.id)){ errEl.textContent='Already shared with this user.'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  sw.push(target.id);
+  DB.patchFile(shrId,{sharedWith:sw});
+  document.getElementById('shareEmailIn').value='';
+  renderShareUsers(DB.getFile(shrId));
+  renderFiles(); updateStats();
+  toast(`Shared with ${target.firstName}! 🔗`,'ok');
+}
+function removeShareUser(uid){
+  const f=DB.getFile(shrId);if(!f)return;
+  const sw=(f.sharedWith||[]).filter(id=>id!==uid);
+  DB.patchFile(shrId,{sharedWith:sw});
+  renderShareUsers(DB.getFile(shrId));
+  renderFiles(); updateStats();
+  toast('Access removed.','inf');
+}
+function copyLink(){
+  const val=document.getElementById('shareLinkVal').value;
+  navigator.clipboard?.writeText(val).then(()=>toast('Link copied!','ok')).catch(()=>{document.getElementById('shareLinkVal').select();document.execCommand('copy');toast('Copied!','ok')});
+}
+
+// ─────────────────────────────────────────────
+//  SHARED WITH ME
+// ─────────────────────────────────────────────
+function openSharedModal(){
+  const files=DB.sharedWith(me.id);
+  const body=document.getElementById('sharedMeBody');
+  if(!files.length){ body.innerHTML='<div class="empty"><div class="empty-icon" style="font-size:36px">📭</div><h3>Nothing shared yet</h3><p>Files shared with your account will appear here.</p></div>'; }
+  else {
+    body.innerHTML=`<div class="list">${files.map(f=>{
+      const owner=DB.findById(f.ownerId);
+      const ownerName=owner?owner.firstName+' '+owner.lastName:'Unknown';
+      return `<div class="frow"><div class="fr-ic">${fileicon(f.type,f.name)}</div><div class="fr-info"><div class="fr-name">${f.name}</div><div class="fr-meta">Shared by <span class="fr-owner-lbl">${ownerName}</span> · ${fmtDt(f.date)}</div></div><div class="fr-sz">${fmtSz(f.size)}</div><button class="fr-btn" style="display:inline-flex" onclick="dlFile('${f.id}')">⬇ Download</button></div>`;
+    }).join('')}</div>`;
+  }
+  closeDropdown(); openModal('modalShared');
+}
+
+// ─────────────────────────────────────────────
+//  PROFILE
+// ─────────────────────────────────────────────
+function openProfileModal(){
+  const av=document.getElementById('profAvatar');
+  if(me.googlePicture) av.innerHTML=`<img src="${me.googlePicture}" style="width:100%;height:100%;object-fit:cover;border-radius:16px">`;
+  else av.textContent=initials(me.firstName+' '+(me.lastName||''));
+  document.getElementById('profName').textContent=me.firstName+' '+(me.lastName||'');
+  document.getElementById('profEmail').textContent=me.email;
+  document.getElementById('profJoined').textContent='Member since '+fmtDt(me.joined);
+  document.getElementById('profMethod').textContent=me.method==='google'?'🔵 Signed in with Google':'📧 Email account';
+  openModal('modalProfile');
+}
+
+// ─────────────────────────────────────────────
+//  CONTEXT MENU
+// ─────────────────────────────────────────────
+function showCtx(e,id){
+  e.preventDefault(); ctxId=id;
+  const m=document.getElementById('ctxMenu');
+  m.style.left=Math.min(e.clientX,window.innerWidth-190)+'px';
+  m.style.top=Math.min(e.clientY,window.innerHeight-185)+'px';
+  m.classList.add('on');
+}
+function hideCtx(){ document.getElementById('ctxMenu').classList.remove('on'); }
+function ctxDo(action){
+  hideCtx();
+  if(action==='download') dlFile(ctxId);
+  else if(action==='star') toggleStar(ctxId);
+  else if(action==='share') openShare(ctxId);
+  else if(action==='rename') openRename(ctxId);
+  else if(action==='delete') promptDelete(ctxId);
+}
+
+// ─────────────────────────────────────────────
+//  MODAL / DROPDOWN HELPERS
+// ─────────────────────────────────────────────
+function openModal(id){ document.getElementById(id).classList.add('on'); }
+function closeModal(id){ document.getElementById(id).classList.remove('on'); }
+function toggleDropdown(){ document.getElementById('userDropdown').classList.toggle('on'); }
+function closeDropdown(){ document.getElementById('userDropdown').classList.remove('on'); }
+
+// ─────────────────────────────────────────────
+//  DRAG & DROP
+// ─────────────────────────────────────────────
+const dz=document.getElementById('dropZone');
+document.body.addEventListener('dragover',e=>{ e.preventDefault(); dz?.classList.add('active'); });
+document.body.addEventListener('dragleave',e=>{ if(!e.relatedTarget) dz?.classList.remove('active'); });
+document.body.addEventListener('drop',e=>{ e.preventDefault(); dz?.classList.remove('active'); if(e.dataTransfer.files.length&&me) handleUpload(e.dataTransfer.files); });
+
+// ─────────────────────────────────────────────
+//  GLOBAL LISTENERS
+// ─────────────────────────────────────────────
+document.addEventListener('click',e=>{
+  if(!document.getElementById('ctxMenu').contains(e.target)) hideCtx();
+  if(!document.getElementById('userDropdown').contains(e.target)&&!document.getElementById('topAvatar')?.contains(e.target)) closeDropdown();
+  document.querySelectorAll('.modal-bg').forEach(m=>{ if(e.target===m) m.classList.remove('on'); });
+});
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+function initApp(){
+  document.getElementById('setupWizard').style.display='none';
+  document.getElementById('authWrap').style.display='flex';
+
+  // Init Google OAuth if configured
+  setTimeout(initGoogleOAuth, 500);
+
+  // Seed demo user
+  if(!DB.findByEmail('demo@vault.io')){
+    DB.upsertUser({email:'demo@vault.io',firstName:'Demo',lastName:'User',pwHash:hash('Demo1234'),method:'email'});
+  }
+
+  // Check existing session
+  const session=DB.getSession();
+  if(session){
+    const user=DB.findByEmail(session.email);
+    if(user){ launchApp(user); document.getElementById('authWrap').style.display='none'; return; }
+  }
+  showAuth('pageLogin');
+}
+
+loadCfg();
+
+// If already configured, skip wizard
+if(localStorage.getItem('vd_cfg')) {
+  initApp();
+} else {
+  // Show wizard first time
+  document.getElementById('setupWizard').style.display='flex';
+}
+</script>
+</body>
+</html>
